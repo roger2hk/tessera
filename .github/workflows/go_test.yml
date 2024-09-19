@@ -37,3 +37,37 @@ jobs:
           mysql -e "CREATE DATABASE IF NOT EXISTS $DB_DATABASE;" -u$DB_USER -p$DB_PASSWORD
       - name: Test with Go
         run: go test -v -race ./storage/mysql/... -is_mysql_test_optional=false
+
+  test-postgresql:
+    env:
+      DB_DATABASE: test_tessera
+      DB_USER: root
+      DB_PASSWORD: root
+
+    runs-on: ubuntu-latest
+    
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: tessera
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Start PostgreSQL
+        run: |
+          sudo /etc/init.d/postgresql start
+          mysql -e "CREATE DATABASE IF NOT EXISTS $DB_DATABASE;" -u$DB_USER -p$DB_PASSWORD
+      - name: Test with Go
+        run: go test -v -race ./storage/postgresql/... -is_postgresql_test_optional=false

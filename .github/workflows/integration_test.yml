@@ -33,3 +33,17 @@ jobs:
       - name: Stop Docker services (tessera-conformance-posix)
         if: ${{ always() }}
         run: docker compose -f ./cmd/conformance/posix/docker/compose.yaml down
+
+  postgresql-tlog-tiles-api:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Start Docker services (tessera-conformance-postgresql-db and tessera-conformance-postgresql)
+        run: docker compose -f ./cmd/conformance/postgresql/docker/compose.yaml up --build --detach
+      - name: Run integration test 
+        run: go test -v -race ./integration/... --run_integration_test=true --log_url="http://localhost:2024" --write_log_url="http://localhost:2024" --log_public_key="Test-Betty+df84580a+AQQASqPUZoIHcJAF5mBOryctwFdTV1E0GRY4kEAtTzwB"
+      - name: Stop Docker services (tessera-conformance-postgresql-db and tessera-conformance-postgresql)
+        if: ${{ always() }}
+        run: docker compose -f ./cmd/conformance/postgresql/docker/compose.yaml down
