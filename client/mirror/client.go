@@ -406,20 +406,30 @@ func (c *Client) buildCheckpointRequestBody(oldSize uint64, proof [][]byte, chec
 // Sync synchronizes all entries and the checkpoint from the source log to the mirror
 // up to the specified targetSize. It returns the mirror's cosignatures on success.
 func (c *Client) Sync(ctx context.Context, targetCheckpointRaw []byte, targetSize uint64) ([]byte, error) {
-	// Get the mirror's current state by querying it with upload_start=0, upload_end=0 (guaranteed to conflict).
-	_, err := c.pushEntries(ctx, 0, 0, nil)
-	if err == nil {
-		return nil, errors.New("unexpected success when querying mirror status with size 0")
-	}
-
+	var cosigs []byte
+	var err error
 	var conflict ErrConflict
-	if !errors.As(err, &conflict) {
-		return nil, fmt.Errorf("failed to retrieve mirror status: %v", err)
-	}
 
-	oldSize := conflict.PendingSize
-	nextEntry := conflict.NextEntry
-	ticket := conflict.Ticket
+	// Get the mirror's current state by querying it with upload_start=0, upload_end=0.
+	cosigs, err = c.pushEntries(ctx, 0, 0, nil)
+
+	var oldSize, nextEntry uint64
+	var ticket []byte
+	if err == nil {
+		if targetSize == 0 {
+			return cosigs, nil
+		}
+		oldSize = 0
+		nextEntry = 0
+		ticket = nil
+	} else {
+		if !errors.As(err, &conflict) {
+			return nil, fmt.Errorf("failed to retrieve mirror status: %v", err)
+		}
+		oldSize = conflict.PendingSize
+		nextEntry = conflict.NextEntry
+		ticket = conflict.Ticket
+	}
 
 	// If the mirror's pending checkpoint is smaller than target size, update it first.
 	if oldSize < targetSize {
@@ -443,7 +453,6 @@ func (c *Client) Sync(ctx context.Context, targetCheckpointRaw []byte, targetSiz
 	// Push entries up to target size in packages of 256, handling concurrent conflicts and retries.
 	uploadEnd := max(targetSize, oldSize)
 
-	var cosigs []byte
 	for {
 		var err error
 		cosigs, err = c.pushEntries(ctx, nextEntry, uploadEnd, ticket)

@@ -732,11 +732,18 @@ func TestSync_ErrorsAndEdgeCases(t *testing.T) {
 		wantErr                string
 	}{
 		{
-			desc:               "initial status query returns unexpected success",
+			desc:               "initial status query returns success",
 			initialPendingSize: 0,
 			initialNextEntry:   0,
 			initialStatus:      http.StatusOK,
-			wantErr:            "unexpected success when querying mirror status with size 0",
+			addEntriesExpectations: []addEntriesExpectation{
+				{
+					start:  0,
+					end:    5,
+					ticket: nil,
+					status: http.StatusOK,
+				},
+			},
 		},
 		{
 			desc:               "initial status query returns generic error",
